@@ -13,16 +13,16 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
     hashed_password = Column(String)
-    # Связь с играми пользователя
+    totp_secret = Column(String, nullable=True)
+    is_2fa_enabled = Column(Integer, default=0)
     games = relationship("Game", back_populates="owner")
 
 class Game(Base):
     __tablename__ = "games"
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, index=True)
-    genre = Column(String)          # жанр игры
+    genre = Column(String)
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="games")
 
-# Создаём таблицы (если их нет)
 Base.metadata.create_all(bind=engine)

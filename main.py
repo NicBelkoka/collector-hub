@@ -1,11 +1,15 @@
 import asyncio
+import io
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import List
 
+import pyotp
+import qrcode
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from passlib.context import CryptContext
@@ -13,10 +17,9 @@ from jose import JWTError, jwt
 
 from database import SessionLocal, User, Game
 
-# ---------- Конфигурация приложения ----------
-app = FastAPI(title="Game Collector", description="Коллекционное приложение для игр с рекомендациями")
+# ---------- Конфигурация ----------
+app = FastAPI(title="Game Collector", description="Коллекционное приложение для игр с 2FA")
 
-# Разрешаем CORS для разработки
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,18 +28,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---------- Настройки безопасности ----------
-SECRET_KEY = "supersecretkeychangeme"   # в реальном проекте хранить в .env
+SECRET_KEY = "supersecretkeychangeme"   # замените на случайный в .env
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
+TEMP_TOKEN_EXPIRE_MINUTES = 5
 
-# Хеширование паролей через pbkdf2_sha256 (не требует bcrypt)
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
-
-# Схема для получения Bearer токена
 security = HTTPBearer()
 
-# ---------- Зависимость для получения сессии БД ----------
+# ---------- Зависимость БД ----------
 def get_db():
     db = SessionLocal()
     try:
@@ -44,7 +44,7 @@ def get_db():
     finally:
         db.close()
 
-# ---------- Pydantic модели (схемы данных) ----------
+# ---------- Pydantic модели ----------
 class UserCreate(BaseModel):
     username: str
     password: str
@@ -58,6 +58,7 @@ class UserOut(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+    twofa_required: bool = False
 
 class GameCreate(BaseModel):
     title: str
@@ -75,7 +76,14 @@ class GameRecommendation(BaseModel):
     name: str
     genre: str
 
-# ---------- Вспомогательные функции для аутентификации ----------
+class TwoFactorCode(BaseModel):
+    code: str
+
+class TwoFactorLogin(BaseModel):
+    temp_token: str
+    code: str
+
+# ---------- Вспомогательные функции ----------
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
@@ -95,13 +103,10 @@ def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
     else:
         expire = datetime.utcnow() + timedelta(minutes=15)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
-) -> User:
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security),
+                           db: Session = Depends(get_db)) -> User:
     token = credentials.credentials
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -120,16 +125,9 @@ async def get_current_user(
         raise credentials_exception
     return user
 
-# ---------- Функция-заглушка для рекомендаций (асинхронная) ----------
+# ---------- Функция-заглушка для рекомендаций ----------
 async def get_recommendations_stub(genres: List[str]) -> List[GameRecommendation]:
-    """
-    Заглушка, имитирующая обращение к внешнему сервису или C++ модулю.
-    Позже вы замените на реальный вызов.
-    """
-    # Имитация долгой работы (1 секунда), чтобы показать асинхронность
     await asyncio.sleep(1)
-
-    # База популярных игр по жанрам (для примера)
     game_db = {
         "rpg": ["Ведьмак 3", "Elden Ring", "Baldur's Gate 3", "Skyrim", "Final Fantasy VII"],
         "action": ["Doom Eternal", "Dark Souls", "Sekiro", "Hades", "Devil May Cry 5"],
@@ -137,7 +135,6 @@ async def get_recommendations_stub(genres: List[str]) -> List[GameRecommendation
         "strategy": ["Civilization VI", "StarCraft II", "Total War: Warhammer", "Age of Empires IV", "XCOM 2"],
         "sports": ["FIFA 23", "NBA 2K24", "Madden NFL 24", "Rocket League", "Tony Hawk's Pro Skater"],
     }
-
     recommendations = []
     for genre in genres:
         genre_lower = genre.lower()
@@ -147,7 +144,6 @@ async def get_recommendations_stub(genres: List[str]) -> List[GameRecommendation
                     recommendations.append(GameRecommendation(name=game, genre=genre))
             if len(recommendations) >= 5:
                 break
-    # Если набрали меньше 5, добавим популярные игры по умолчанию
     default_games = ["Portal 2", "Minecraft", "Stardew Valley", "Celeste", "Hollow Knight"]
     for game in default_games:
         if len(recommendations) >= 5:
@@ -156,7 +152,7 @@ async def get_recommendations_stub(genres: List[str]) -> List[GameRecommendation
             recommendations.append(GameRecommendation(name=game, genre="популярное"))
     return recommendations[:5]
 
-# ---------- Эндпоинты API ----------
+# ---------- Эндпоинты ----------
 
 @app.post("/register", response_model=UserOut)
 def register(user: UserCreate, db: Session = Depends(get_db)):
@@ -175,8 +171,75 @@ def login(user: UserCreate, db: Session = Depends(get_db)):
     db_user = authenticate_user(db, user.username, user.password)
     if not db_user:
         raise HTTPException(status_code=400, detail="Неверное имя пользователя или пароль")
-    access_token = create_access_token(data={"sub": db_user.username})
-    return {"access_token": access_token, "token_type": "bearer"}
+    if db_user.is_2fa_enabled:
+        temp_data = {"sub": db_user.username, "2fa_pending": True}
+        temp_token = create_access_token(temp_data, expires_delta=timedelta(minutes=TEMP_TOKEN_EXPIRE_MINUTES))
+        return Token(access_token=temp_token, token_type="bearer", twofa_required=True)
+    else:
+        access_token = create_access_token(data={"sub": db_user.username})
+        return Token(access_token=access_token, token_type="bearer", twofa_required=False)
+
+@app.post("/login-2fa", response_model=Token)
+async def login_2fa(data: TwoFactorLogin, db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(status_code=401, detail="Неверный или истёкший временный токен")
+    try:
+        payload = jwt.decode(data.temp_token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        pending = payload.get("2fa_pending")
+        if not username or not pending:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    user = db.query(User).filter(User.username == username).first()
+    if not user or not user.is_2fa_enabled or not user.totp_secret:
+        raise credentials_exception
+    totp = pyotp.TOTP(user.totp_secret)
+    if not totp.verify(data.code):
+        raise HTTPException(status_code=400, detail="Неверный код 2FA")
+    access_token = create_access_token(data={"sub": user.username})
+    return Token(access_token=access_token, token_type="bearer", twofa_required=False)
+
+@app.post("/enable-2fa")
+async def enable_2fa(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.is_2fa_enabled:
+        raise HTTPException(status_code=400, detail="2FA уже включена")
+    if not current_user.totp_secret:
+        secret = pyotp.random_base32()
+        current_user.totp_secret = secret
+        db.commit()
+    else:
+        secret = current_user.totp_secret
+    totp = pyotp.TOTP(secret)
+    provisioning_uri = totp.provisioning_uri(name=current_user.username, issuer_name="GameCollector")
+    # Генерация QR-кода
+    qr = qrcode.QRCode(box_size=10, border=4)
+    qr.add_data(provisioning_uri)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    img_byte_arr = io.BytesIO()
+    img.save(img_byte_arr, format='PNG')
+    img_byte_arr.seek(0)
+    return StreamingResponse(img_byte_arr, media_type="image/png")
+
+@app.get("/get-2fa-secret")
+async def get_2fa_secret(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not current_user.totp_secret:
+        raise HTTPException(status_code=404, detail="Секрет не сгенерирован. Сначала вызовите POST /enable-2fa")
+    return {"secret": current_user.totp_secret}
+
+@app.post("/verify-2fa")
+async def verify_2fa(code_data: TwoFactorCode, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not current_user.totp_secret:
+        raise HTTPException(status_code=400, detail="2FA не настроена. Сначала вызовите /enable-2fa")
+    if current_user.is_2fa_enabled:
+        raise HTTPException(status_code=400, detail="2FA уже активирована")
+    totp = pyotp.TOTP(current_user.totp_secret)
+    if totp.verify(code_data.code):
+        current_user.is_2fa_enabled = 1
+        db.commit()
+        return {"message": "2FA успешно активирована"}
+    else:
+        raise HTTPException(status_code=400, detail="Неверный код")
 
 @app.post("/games", response_model=GameOut)
 def add_game(game: GameCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -193,18 +256,15 @@ def list_games(current_user: User = Depends(get_current_user), db: Session = Dep
 
 @app.get("/recommendations", response_model=List[GameRecommendation])
 async def recommendations(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Получаем все игры пользователя
     user_games = db.query(Game).filter(Game.owner_id == current_user.id).all()
     if not user_games:
         raise HTTPException(status_code=404, detail="Ваша коллекция пуста. Добавьте хотя бы одну игру.")
     genres = list(set([g.genre for g in user_games if g.genre]))
     if not genres:
         raise HTTPException(status_code=404, detail="В ваших играх не указаны жанры.")
-
-    # Асинхронный вызов функции-заглушки (демонстрация многопоточности)
     loop = asyncio.get_event_loop()
     recommendations_list = await loop.run_in_executor(None, lambda: asyncio.run(get_recommendations_stub(genres)))
     return recommendations_list
 
-# ---------- Раздача статических файлов (фронтенд) ----------
+# ---------- Статика ----------
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

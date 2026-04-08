@@ -4,3 +4,6 @@ python-multipart
 sqlalchemy
 passlib
 python-jose[cryptography]
+pyotp
+qrcode
+pillow

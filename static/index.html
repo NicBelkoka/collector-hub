@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Игровой коллекционер</title>
+    <title>Игровой коллекционер с 2FA</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -17,6 +17,13 @@
             <button id="loginBtn">Войти</button>
             <button id="registerBtn">Зарегистрироваться</button>
             <div id="auth-error" class="error"></div>
+
+            <div id="twofa-section" style="display: none;">
+                <h3>Двухфакторная аутентификация</h3>
+                <input type="text" id="twofa-code" placeholder="Код из приложения">
+                <button id="verify2faBtn">Подтвердить</button>
+                <div id="twofa-error" class="error"></div>
+            </div>
         </div>
 
         <div id="collection-section" style="display: none;">
@@ -32,6 +39,19 @@
                 <h3>Получить рекомендации</h3>
                 <button id="getRecommendationsBtn">🎯 Рекомендовать игры на основе моей коллекции</button>
                 <div id="recommendationsResult" class="recommendations-list"></div>
+            </div>
+
+            <div>
+                <button id="enable2faBtn">Включить двухфакторную аутентификацию (2FA)</button>
+                <div id="twofa-setup" style="display: none;">
+                    <h4>Настройка 2FA</h4>
+                    <p><strong>Секрет:</strong> <span id="twofa-secret"></span></p>
+                    <p>Отсканируйте QR-код приложением Google Authenticator:</p>
+                    <img id="twofa-qr" src="" alt="QR-код" style="max-width: 200px;">
+                    <p>Или введите секрет вручную.</p>
+                    <input type="text" id="twofa-verify-code" placeholder="Код для подтверждения">
+                    <button id="confirm2faBtn">Активировать 2FA</button>
+                </div>
             </div>
 
             <button id="logoutBtn">Выйти</button>
