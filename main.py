@@ -1,10 +1,13 @@
+import subprocess
 import asyncio
+import os
 import io
 from datetime import datetime, timedelta
 from typing import List
 
 import pyotp
 import qrcode
+from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -19,7 +22,8 @@ from database import SessionLocal, User, Game
 
 # ---------- Конфигурация ----------
 app = FastAPI(title="Game Collector", description="Коллекционное приложение для игр с 2FA")
-
+load_dotenv()
+RAWG_API_KEY = os.getenv("RAWG_API_KEY")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -127,30 +131,52 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 # ---------- Функция-заглушка для рекомендаций ----------
 async def get_recommendations_stub(genres: List[str]) -> List[GameRecommendation]:
-    await asyncio.sleep(1)
-    game_db = {
-        "rpg": ["Ведьмак 3", "Elden Ring", "Baldur's Gate 3", "Skyrim", "Final Fantasy VII"],
-        "action": ["Doom Eternal", "Dark Souls", "Sekiro", "Hades", "Devil May Cry 5"],
-        "adventure": ["The Legend of Zelda", "God of War", "Uncharted 4", "Tomb Raider", "Horizon Zero Dawn"],
-        "strategy": ["Civilization VI", "StarCraft II", "Total War: Warhammer", "Age of Empires IV", "XCOM 2"],
-        "sports": ["FIFA 23", "NBA 2K24", "Madden NFL 24", "Rocket League", "Tony Hawk's Pro Skater"],
-    }
-    recommendations = []
-    for genre in genres:
-        genre_lower = genre.lower()
-        if genre_lower in game_db:
-            for game in game_db[genre_lower]:
-                if not any(rec.name == game for rec in recommendations):
-                    recommendations.append(GameRecommendation(name=game, genre=genre))
-            if len(recommendations) >= 5:
-                break
-    default_games = ["Portal 2", "Minecraft", "Stardew Valley", "Celeste", "Hollow Knight"]
-    for game in default_games:
-        if len(recommendations) >= 5:
-            break
-        if not any(rec.name == game for rec in recommendations):
-            recommendations.append(GameRecommendation(name=game, genre="популярное"))
-    return recommendations[:5]
+    # Если нет жанров, возвращаем пустой список
+    if not genres:
+        return []
+
+    # Формируем строку жанров, разделённых запятыми
+    genres_str = ",".join(genres).lower()
+    
+    # Путь к исполняемому файлу C++ модуля
+    cpp_program = "./cpp_module/recommend.exe"
+
+    # Проверяем, существует ли файл
+    if not os.path.exists(cpp_program):
+        print(f"Ошибка: Модуль рекомендаций не найден по пути {cpp_program}")
+        return []
+
+    try:
+        # Запускаем C++ программу асинхронно
+        process = await asyncio.create_subprocess_exec(
+            cpp_program, genres_str, RAWG_API_KEY,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await process.communicate()
+
+        if process.returncode != 0:
+            print(f"Ошибка выполнения C++ модуля: {stderr.decode('utf-8')}")
+            return []
+
+        # Парсим вывод программы
+        output = stdout.decode('utf-8').strip()
+        recommended_games = []
+        for line in output.split('\n'):
+            if '|' not in line:
+                continue
+            try:
+                game_id_str, game_name = line.split('|', 1)
+                recommended_games.append(GameRecommendation(name=game_name, genre="рекомендация"))
+            except ValueError:
+                continue
+
+        # Возвращаем первые 5 результатов
+        return recommended_games[:5]
+
+    except Exception as e:
+        print(f"Ошибка при вызове C++ модуля: {e}")
+        return []
 
 # ---------- Эндпоинты ----------
 
