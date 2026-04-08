@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Игровой коллекционер</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Игровой коллекционер</h1>
+
+        <div id="auth-section">
+            <h2>Вход / Регистрация</h2>
+            <input type="text" id="username" placeholder="Имя пользователя">
+            <input type="password" id="password" placeholder="Пароль">
+            <button id="loginBtn">Войти</button>
+            <button id="registerBtn">Зарегистрироваться</button>
+            <div id="auth-error" class="error"></div>
+        </div>
+
+        <div id="collection-section" style="display: none;">
+            <h2>Моя коллекция игр</h2>
+            <form id="addGameForm">
+                <input type="text" id="title" placeholder="Название игры" required>
+                <input type="text" id="genre" placeholder="Жанр (например, RPG, Action)" required>
+                <button type="submit">Добавить игру</button>
+            </form>
+            <ul id="gamesList"></ul>
+
+            <div id="recommendation-section">
+                <h3>Получить рекомендации</h3>
+                <button id="getRecommendationsBtn">🎯 Рекомендовать игры на основе моей коллекции</button>
+                <div id="recommendationsResult" class="recommendations-list"></div>
+            </div>
+
+            <button id="logoutBtn">Выйти</button>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
