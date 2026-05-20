@@ -22,6 +22,7 @@ class Game(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, index=True)
     genre = Column(String)
+    external_id = Column(Integer, nullable=True)   # <-- обязательно
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="games")
 
