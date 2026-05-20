@@ -224,6 +224,10 @@ document.getElementById('addGameForm').onsubmit = async (e) => {
     e.preventDefault();
     const title = document.getElementById('title').value;
     const genre = document.getElementById('genre').value;
+    if (!genre) {
+        alert('Выберите жанр');
+        return;
+    }
     try {
         const res = await fetch(`${API_BASE}/games`, {
             method: 'POST',

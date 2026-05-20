@@ -37,26 +37,28 @@ json performGetRequest(const std::string& url) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 3) {
-        std::cerr << "Usage: " << argv[0] << " \"<genres_comma_separated>\" <API_KEY>" << std::endl;
+    if (argc < 3 || argc > 4) {
+        std::cerr << "Usage: " << argv[0] << " \"<genres_comma_separated>\" <API_KEY> [page]" << std::endl;
         return 1;
     }
     std::string genres = argv[1];
     std::string apiKey = argv[2];
+    int page = 1;
+    if (argc == 4) {
+        page = std::stoi(argv[3]);
+    }
 
     std::string url;
     if (genres.empty() || genres == "popular") {
-        // Запрос без фильтрации по жанрам – просто топовые игры
-        url = "https://api.rawg.io/api/games?ordering=-rating&page_size=10&key=" + apiKey;
+        url = "https://api.rawg.io/api/games?ordering=-rating&page_size=20&page=" + std::to_string(page) + "&key=" + apiKey;
     } else {
-        // Кодируем строку жанров (например "rpg,action")
         CURL* curl = curl_easy_init();
         char* encoded = curl_easy_escape(curl, genres.c_str(), (int)genres.length());
         std::string encodedGenres(encoded);
         curl_free(encoded);
         curl_easy_cleanup(curl);
         url = "https://api.rawg.io/api/games?genres=" + encodedGenres +
-              "&ordering=-rating&page_size=10&key=" + apiKey;
+              "&ordering=-rating&page_size=20&page=" + std::to_string(page) + "&key=" + apiKey;
     }
 
     json resp = performGetRequest(url);

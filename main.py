@@ -235,36 +235,28 @@ def list_games(current_user: User = Depends(get_current_user), db: Session = Dep
     return db.query(Game).filter(Game.owner_id == current_user.id).all()
 
 # ---------- Recommendations via C++ module (by genres) ----------
-async def get_recommendations_from_cpp(genres_str: str) -> List[GameRecommendation]:
+async def get_recommendations_from_cpp(genres_str: str, page: int = 1) -> List[GameRecommendation]:
     if not RAWG_API_KEY:
-        print("[DEBUG] No API key")
         return []
     cpp_program = "./cpp_module/recommend.exe"
-    abs_path = os.path.abspath(cpp_program)
-    print(f"[DEBUG] Full path to C++ module: {abs_path}")
-    if not os.path.exists(abs_path):
-        print(f"[DEBUG] Module not found at {abs_path}")
+    if not os.path.exists(cpp_program):
         return []
-    print(f"[DEBUG] Calling C++ with genres: {genres_str}")
     try:
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
             None,
             lambda: subprocess.run(
-                [abs_path, genres_str, RAWG_API_KEY],
+                [cpp_program, genres_str, RAWG_API_KEY, str(page)],
                 capture_output=True,
                 text=True,
                 timeout=30,
                 encoding='utf-8'
             )
         )
-        print(f"[DEBUG] Return code: {result.returncode}")
-        if result.stderr:
-            print(f"[DEBUG] STDERR: {result.stderr.strip()}")
+        if result.returncode != 0:
+            return []
         output = result.stdout.strip()
-        print(f"[DEBUG] STDOUT length: {len(output)}")
         if not output:
-            print("[DEBUG] Empty output")
             return []
         games = []
         for line in output.split('\n'):
@@ -278,29 +270,23 @@ async def get_recommendations_from_cpp(genres_str: str) -> List[GameRecommendati
                     name = parts[1]
                     genre = parts[2]
                     games.append(GameRecommendation(id=game_id, name=name, genre=genre))
-                except Exception as e:
-                    print(f"[DEBUG] Parse error: {e} on line '{line}'")
-        print(f"[DEBUG] Parsed {len(games)} games")
+                except:
+                    continue
+        games = [g for g in games if g.genre and g.genre.strip()]
         return games
-    except subprocess.TimeoutExpired:
-        print("[DEBUG] Timeout")
-        return []
     except Exception as e:
-        print(f"[DEBUG] Exception: {type(e).__name__}: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"[DEBUG] Exception: {e}")
         return []
 
 @app.get("/recommendations", response_model=List[GameRecommendation])
 async def recommendations(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     user_games = db.query(Game).filter(Game.owner_id == current_user.id).all()
     if not user_games:
-        # Коллекция пуста — возвращаем популярные игры
         popular = await get_recommendations_from_cpp("popular")
         return popular[:5]
 
-    # Собираем уникальные жанры (преобразуем в slugs для RAWG)
-    genres_set = set()
+    # Собираем жанры пользователя (оригинальные названия)
+    user_genres = set()
     genre_map = {
         "ролевая": "rpg", "ролевые": "rpg", "rpg": "rpg",
         "экшен": "action", "action": "action",
@@ -313,17 +299,25 @@ async def recommendations(current_user: User = Depends(get_current_user), db: Se
     for g in user_games:
         if g.genre:
             slug = genre_map.get(g.genre.lower(), g.genre.lower())
-            genres_set.add(slug)
-    if not genres_set:
-        popular = await get_recommendations_from_cpp("")
+            user_genres.add(slug)
+
+    if not user_genres:
+        popular = await get_recommendations_from_cpp("popular")
         return popular[:5]
 
-    genres_str = ",".join(genres_set)
+    genres_str = ",".join(user_genres)
     raw_recs = await get_recommendations_from_cpp(genres_str)
-    existing_ids = {g.external_id for g in user_games if g.external_id}
-    filtered = [g for g in raw_recs if g.id not in existing_ids]
 
-    # Если после фильтрации ничего не осталось — берём популярные игры
+    # Фильтр 1: исключаем игры без жанра
+    raw_recs = [g for g in raw_recs if g.genre.strip()]
+
+    # Фильтр 2: оставляем только те, чей жанр входит в user_genres
+    allowed_genres = {genre.lower() for genre in user_genres}
+    filtered_by_genre = [g for g in raw_recs if g.genre.lower() in allowed_genres]
+
+    existing_ids = {g.external_id for g in user_games if g.external_id}
+    filtered = [g for g in filtered_by_genre if g.id not in existing_ids]
+
     if not filtered:
         popular = await get_recommendations_from_cpp("popular")
         return popular[:5]

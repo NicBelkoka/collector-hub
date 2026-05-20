@@ -29,9 +29,18 @@
         <div id="collection-section" style="display: none;">
             <h2>Моя коллекция игр</h2>
             <form id="addGameForm">
-                <input type="text" id="title" placeholder="Название игры" required>
-                <input type="text" id="genre" placeholder="Жанр (например, RPG, Action)" required>
-                <button type="submit">Добавить игру</button>
+            <input type="text" id="title" placeholder="Название игры" required>
+            <select id="genre" required>
+                <option value="" disabled selected>Выберите жанр</option>
+                <option value="RPG">RPG</option>
+                <option value="Action">Action</option>
+                <option value="Shooter">Shooter</option>
+                <option value="Strategy">Strategy</option>
+                <option value="Adventure">Adventure</option>
+                <option value="Simulation">Simulation</option>
+                <option value="Indie">Indie</option>
+            </select>
+            <button type="submit">Добавить игру</button>
             </form>
             <ul id="gamesList"></ul>
 
