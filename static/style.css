@@ -1,99 +1,118 @@
+/* Стиль для всей страницы (body) */
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    margin: 0;
-    padding: 20px;
-    background-color: #f0f2f5;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;  /* Семейство шрифтов */
+    margin: 0;  /* Убираем внешние отступы */
+    padding: 20px;  /* Внутренние отступы со всех сторон */
+    background-color: #f0f2f5;  /* Светло-серый фон */
 }
 
+/* Стиль для контейнера (основного блока) */
 .container {
-    max-width: 800px;
-    margin: 0 auto;
-    background-color: white;
-    padding: 30px;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    max-width: 800px;  /* Максимальная ширина 800 пикселей */
+    margin: 0 auto;  /* Центрирование по горизонтали */
+    background-color: white;  /* Белый фон */
+    padding: 30px;  /* Внутренние отступы */
+    border-radius: 10px;  /* Скругленные углы */
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);  /* Тень */
 }
 
+/* Стили для заголовков h1, h2, h3 */
 h1, h2, h3 {
-    color: #1a1a2e;
+    color: #1a1a2e;  /* Темно-синий цвет */
 }
 
+/* Стили для полей ввода и кнопок */
 input, button {
-    margin: 8px 5px;
-    padding: 10px;
-    border-radius: 5px;
-    border: 1px solid #ccc;
-    font-size: 16px;
+    margin: 8px 5px;  /* Отступы сверху/снизу 8px, слева/справа 5px */
+    padding: 10px;  /* Внутренние отступы */
+    border-radius: 5px;  /* Скругленные углы */
+    border: 1px solid #ccc;  /* Светло-серая рамка */
+    font-size: 16px;  /* Размер шрифта */
 }
 
+/* Стили только для кнопок (переопределяет input) */
 button {
-    background-color: #4a90e2;
-    color: white;
-    cursor: pointer;
-    transition: background-color 0.3s;
-    border: none;
+    background-color: #4a90e2;  /* Синий фон */
+    color: white;  /* Белый текст */
+    cursor: pointer;  /* Курсор в виде указателя */
+    transition: background-color 0.3s;  /* Плавная анимация при наведении */
+    border: none;  /* Убираем рамку */
 }
 
+/* Стиль кнопки при наведении мыши */
 button:hover {
-    background-color: #357abd;
+    background-color: #357abd;  /* Более темный синий */
 }
 
+/* Стиль для сообщений об ошибках */
 .error {
-    color: red;
-    margin-top: 10px;
+    color: red;  /* Красный текст */
+    margin-top: 10px;  /* Отступ сверху */
 }
 
+/* Стиль для маркированных списков (ul) */
 ul {
-    list-style-type: none;
-    padding: 0;
+    list-style-type: none;  /* Убираем маркеры списка */
+    padding: 0;  /* Убираем внутренние отступы */
 }
 
+/* Стиль для элементов списка (li) */
 li {
-    background-color: #f8f9fa;
-    margin: 8px 0;
-    padding: 10px;
-    border-radius: 5px;
-    border-left: 4px solid #4a90e2;
+    background-color: #f8f9fa;  /* Светло-серый фон */
+    margin: 8px 0;  /* Отступы сверху и снизу */
+    padding: 10px;  /* Внутренние отступы */
+    border-radius: 5px;  /* Скругленные углы */
+    border-left: 4px solid #4a90e2;  /* Синяя полоска слева */
 }
 
+/* Стиль для блока с рекомендациями */
 .recommendations-list {
-    margin-top: 20px;
-    background-color: #e9ecef;
-    padding: 15px;
-    border-radius: 8px;
+    margin-top: 20px;  /* Отступ сверху */
+    background-color: #e9ecef;  /* Серый фон */
+    padding: 15px;  /* Внутренние отступы */
+    border-radius: 8px;  /* Скругленные углы */
 }
 
+/* Стиль для каждого элемента рекомендации */
 .recommendation-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background-color: white;
-    margin: 8px 0;
-    padding: 10px;
-    border-radius: 5px;
-    border-left: 4px solid #28a745;
+    display: flex;  /* Flexbox для выравнивания */
+    justify-content: space-between;  /* Распределяем пространство между элементами */
+    align-items: center;  /* Выравнивание по вертикали по центру */
+    background-color: white;  /* Белый фон */
+    margin: 8px 0;  /* Отступы сверху и снизу */
+    padding: 10px;  /* Внутренние отступы */
+    border-radius: 5px;  /* Скругленные углы */
+    border-left: 4px solid #28a745;  /* Зеленая полоска слева */
 }
 
+/* Стиль для кнопки выхода */
 #logoutBtn {
-    background-color: #dc3545;
-    margin-top: 20px;
+    background-color: #dc3545;  /* Красный фон */
+    margin-top: 20px;  /* Отступ сверху */
 }
 
+/* Стиль кнопки выхода при наведении */
 #logoutBtn:hover {
-    background-color: #c82333;
+    background-color: #c82333;  /* Темно-красный фон */
 }
+
+/* Стиль для кнопки добавления из рекомендаций */
 .add-rec-btn {
-    background-color: #28a745;
-    color: white;
-    border: none;
-    padding: 5px 10px;
-    border-radius: 5px;
-    cursor: pointer;
+    background-color: #28a745;  /* Зеленый фон */
+    color: white;  /* Белый текст */
+    border: none;  /* Убираем рамку */
+    padding: 5px 10px;  /* Внутренние отступы (меньше, чем у обычной кнопки) */
+    border-radius: 5px;  /* Скругленные углы */
+    cursor: pointer;  /* Курсор-указатель */
 }
+
+/* Стиль кнопки добавления при наведении */
 .add-rec-btn:hover {
-    background-color: #218838;
+    background-color: #218838;  /* Темно-зеленый фон */
 }
+
+/* Стиль для блока результата рекомендаций (временный, для отладки) */
 #recommendationsResult {
-    border: 1px solid red;
-    min-height: 50px;
+    border: 1px solid red;  /* Красная рамка (для отладки) */
+    min-height: 50px;  /* Минимальная высота 50 пикселей */
 }
